@@ -14,5 +14,5 @@ mount -t tmpfs -o size=4g tmpfs /mytmpfs
 #/sbin/ip addr add 10.0.2.15 dev eth0
 #/sbin/ip link set dev eth0 up
 
-exec /bin/bash
+exec shutdown
 
