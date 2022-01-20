@@ -1,6 +1,4 @@
-
 #!/bin/bash
 
-#Force QEMU to Reboot (note: setting -no-reboot flag in the QEMU options will force QEMU to shutdown)
 echo 1 > /proc/sys/kernel/sysrq
 echo b > /proc/sysrq-trigger

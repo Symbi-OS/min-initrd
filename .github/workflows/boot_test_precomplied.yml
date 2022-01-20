@@ -1,0 +1,50 @@
+name: Min-initrd Boot Test
+# Note: This workflow boot the kernel that has been pre-complied within this repo
+
+# Controls when the workflow will run
+on:
+  # Triggers the workflow on push or pull request events but only for the master branch
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+jobs:
+
+  BOOT_TEST:
+  
+    # The type of runner that the job will run on
+    runs-on: ubuntu-latest
+
+    steps:
+          
+       # Checks-out Min-initrd
+      - name: Checkout min-initrd directory
+        uses: actions/checkout@v2
+        with:
+          path: min-initrd
+          
+       # Installs required packages for build
+      - name: Update and install package requirements
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install git build-essential flex bison libelf-dev libssl-dev texinfo libgmp3-dev libmpc-dev libmpfr-dev qemu-kvm supermin 
+          
+      # Boot the Kernel
+      - name: Complie min-initrd
+        run: |  
+          cd min-initrd 
+          make build-package
+          make supermin
+          make all
+          
+      # Runs Boot Test
+      - name: Boot symbiote kernel
+        run: |
+          cd min-initrd 
+          make runU
