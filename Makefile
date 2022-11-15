@@ -1,9 +1,9 @@
-PACKAGES = bash coreutils iputils net-tools strace util-linux iproute pciutils ethtool kmod strace perf python vim mount
+PACKAGES = bash coreutils iputils net-tools strace util-linux iproute pciutils ethtool kmod strace perf python vim mount ssh sshd
 SMD = supermin.d
 
-SMP = 2
+SMP = 1
 TS = 8-11
-QUEUES = 4
+QUEUES = 2
 VECTORS = 10
 
 # This setting is for Github Action runner
@@ -12,13 +12,14 @@ options = -smp cpus=$(SMP) -m 3g -no-reboot
 DEBUG = -S -s
 
 # This is a pre-complied linux within the repo
-KERNELU = -kernel vmlinuz-5.8.0-symbiote+
+KERNELU = -kernel  /boot/vmlinuz-5.14.0-symbiote+
 
 SMOptions = -initrd min-initrd.d/initrd -hda min-initrd.d/root
 DISPLAY = -nodefaults -nographic -serial stdio
 MONITOR = -nodefaults -nographic -serial mon:stdio
-COMMANDLINE = -append "console=ttyS0 root=/dev/sda mitigations=off nosmep nosmap"
-# NETWORK = -netdev tap,id=vlan1,ifname=tap0,script=no,downscript=no,vhost=on,queues=$(QUEUES) -device virtio-net-pci,mq=on,vectors=$(VECTORS),netdev=vlan1,mac=02:00:00:04:00:29
+COMMANDLINE = -append "console=ttyS0 root=/dev/sda mitigations=off nosmep nosmap isolcpus=0"
+
+NETWORK = -netdev tap,id=vlan1,ifname=tap_alpha,script=no,downscript=no,vhost=on,queues=$(QUEUES) -device virtio-net-pci,mq=on,vectors=$(VECTORS),netdev=vlan1,mac=02:00:00:04:00:29
 
 #-----------------------------------------------
 
@@ -37,9 +38,10 @@ KERNELU2 = -kernel ../linux/arch/x86/boot/bzImage
 SMOptions2 = -initrd min-initrd.d/initrd -hda min-initrd.d/root2
 DISPLAY2 = -nodefaults -nographic -serial stdio
 MONITOR2 = -nodefaults -nographic -serial mon:stdio
-COMMANDLINE2 = -append "console=ttyS0 root=/dev/sda net.ifnames=0 biosdevname=0 nosmap mds=off ip=192.168.19.137:::255.255.255.0::eth0:none -- -m /workloads/iperf.xml -a"
-NETWORK2 = -netdev tap,id=vlan1,ifname=tap2,script=no,downscript=no,vhost=on,queues=$(QUEUES2) -device virtio-net-pci,mq=on,vectors=$(VECTORS2),netdev=vlan1,mac=02:00:00:04:00:30
 
+COMMANDLINE = -append "console=ttyS0 root=/dev/sda mitigations=off nosmep nosmap isolcpus=0"
+
+NETWORK2 = -netdev tap,id=vlan1,ifname=tap_beta,script=no,downscript=no,vhost=on,queues=$(QUEUES) -device virtio-net-pci,mq=on,vectors=$(VECTORS),netdev=vlan1,mac=02:00:00:04:00:28
 #-----------------------------------------------
 
 TARGET = min-initrd.d
@@ -93,11 +95,16 @@ supermin.d/mybench.static.tar.gz: mybench.static
 supermin.d/server.static.tar.gz: server.static
 	tar zcf $@ $^
 
-$(TARGET)/root: supermin.d/packages supermin.d/init.tar.gz supermin.d/shutdown.tar.gz #supermin.d/workloads.tar.gz \
-	supermin.d/set_irq_affinity_virtio.sh.tar.gz supermin.d/mybench_small.static.tar.gz 
-	supermin --build -v -v -v --size 4G --if-newer --format ext2 supermin.d -o ${@D}
-	# - rm -rf $(TARGET)/root2
-	# cp $(TARGET)/root $(TARGET)/root2
+supermin.d/server.tar.gz: ~/Symbi-OS/Apps/examples/my_server/server_RW
+	tar zcf $@ $^
+
+supermin.d/client.tar.gz: ~/Symbi-OS/Apps/examples/my_server/client_RW
+	tar zcf $@ $^
+
+$(TARGET)/root: supermin.d/packages supermin.d/init.tar.gz supermin.d/shutdown.tar.gz supermin.d/client.tar.gz supermin.d/server.tar.gz
+	supermin --build -v -v -v --size 8G --if-newer --format ext2 supermin.d -o ${@D}
+	rm -rf $(TARGET)/root2:
+	cp $(TARGET)/root $(TARGET)/root2
 
 # NOTE: This might not work as written
 exportmods:
@@ -105,16 +112,17 @@ exportmods:
 	export SUPERMIN_MODULES=/mnt/normal/min-initrd/kmods/lib/modules/5.7.0+/
 
 
-# runU will boot the kernel using the pre-comiled symbiote kernel within this repo
-runU:
-	$(QEMU) $(options) $(KERNELU) $(SMOptions) $(DISPLAY) $(COMMANDLINE) $(NETWORK)
 
 debugU: 
-	$(QEMU) $(options) $(DEBUG) $(KERNELU) $(SMOptions) $(DISPLAY) $(COMMANDLINE) $(NETWORK)
+	$(QEMU) $(options) $(DEBUG) $(KERNELU) $(SMOptions) $(MONITOR) $(COMMANDLINE) $(NETWORK)
 
 monU:
 	$(QEMU) $(options) $(KERNELU) $(SMOptions) $(MONITOR) $(COMMANDLINE) $(NETWORK)
 
-# runU2 will boot the kernel using the kernel complied from symbiote linux repo.
-runU2:
-	$(QEMU) $(options) $(KERNELU2) $(SMOptions) $(DISPLAY) $(COMMANDLINE) $(NETWORK)
+# runU will boot the kernel using the pre-comiled symbiote kernel within this repo
+run-alpha:
+	$(QEMU) $(options) $(KERNELU) $(SMOptions) $(MONITOR) $(COMMANDLINE) $(NETWORK)
+
+# this boots with another root disk so we don't have conflicts.
+run-beta:
+	$(QEMU) $(options) $(KERNELU) $(SMOptions2) $(MONITOR) $(COMMANDLINE) $(NETWORK2)
